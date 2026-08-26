@@ -1,0 +1,224 @@
+{
+  "sistema_coordenadas": {
+    "X": "horizontal F→G",
+    "Y": "horizontal eje 1→eje 2",
+    "Z": "vertical positiva hacia arriba",
+    "unidades": "m, kN, s"
+  },
+  "geometria": {
+    "LX": 10.0,
+    "LY": 8.9,
+    "H": 3.96,
+    "num_panos": 2,
+    "ancho_pano": 5.0,
+    "largo_pano": 8.9
+  },
+  "nodos": {
+    "base": {
+      "A": [0.0, 0.0, 0.0],
+      "C": [10.0, 0.0, 0.0],
+      "D": [0.0, 8.9, 0.0],
+      "F": [10.0, 8.9, 0.0]
+    },
+    "superior": {
+      "A": [0.0, 0.0, 3.96],
+      "B": [5.0, 0.0, 3.96],
+      "C": [10.0, 0.0, 3.96],
+      "D": [0.0, 8.9, 3.96],
+      "E": [5.0, 8.9, 3.96],
+      "F": [10.0, 8.9, 3.96]
+    }
+  },
+  "materiales": {
+    "concreto": {
+      "E": 25000000.0,
+      "nu": 0.2,
+      "G": 10416666.666666666,
+      "notas": "E=25 GPa, nu=0.20, G=E/(2*(1+nu))"
+    }
+  },
+  "secciones": {
+    "columna": {
+      "nombre": "P.70x70",
+      "tipo": "rectangular",
+      "b": 0.7,
+      "h": 0.7,
+      "A": 0.49,
+      "Iy": 0.020008333333333332,
+      "Iz": 0.020008333333333332,
+      "J": 0.03335694444444445,
+      "notas": "b=eje_local_y, h=eje_local_z, sin cambios"
+    },
+    "viga_T_interior": {
+      "nombre": "T_INTERIOR_8.90",
+      "tipo": "T",
+      "familia": "A",
+      "elementos": [10],
+      "bw": 0.60,
+      "h": 0.80,
+      "hf": 0.15,
+      "hw": 0.65,
+      "beff": 2.825,
+      "A": 0.81375,
+      "y_centroide": 0.6923076923076923,
+      "Iy": 0.030203636887552623,
+      "Iz": 0.007331625,
+      "J": 0.004219488990213207,
+      "notas": "Viga B-E interior, losa a ambos lados. bw=0.60, ala=2.825x0.15, alma=0.60x0.65. Iy=eje_horizontal_centroidal, Iz=eje_vertical_centroidal"
+    },
+    "viga_L_borde_890": {
+      "nombre": "L_BORDE_8.90",
+      "tipo": "L",
+      "familia": "B",
+      "elementos": [9, 11],
+      "bw": 0.60,
+      "h": 0.80,
+      "hf": 0.15,
+      "hw": 0.65,
+      "b_ala": 0.742,
+      "beff": 1.342,
+      "A": 0.45255,
+      "y_centroide": 0.6160232264919836,
+      "Iy": 0.022582236284487998,
+      "Iz": 0.007331625,
+      "J": 0.002495345783454473,
+      "notas": "Vigas A-D y C-F borde 8.90m, losa a un solo lado. bw=0.60, ala=0.742x0.15, alma=0.60x0.65"
+    },
+    "viga_L_borde_500": {
+      "nombre": "L_BORDE_5.00",
+      "tipo": "L",
+      "familia": "C",
+      "elementos": [5, 6, 7, 8],
+      "bw": 0.60,
+      "h": 0.80,
+      "hf": 0.15,
+      "hw": 0.65,
+      "b_ala": 0.417,
+      "beff": 1.017,
+      "A": 0.45255,
+      "y_centroide": 0.5820685302044189,
+      "Iy": 0.022531433707939818,
+      "Iz": 0.006581625,
+      "J": 0.002495345783454473,
+      "notas": "Vigas A-B, B-C, D-E, E-F borde 5.00m, losa a un solo lado. bw=0.60, ala=0.417x0.15, alma=0.60x0.65"
+    },
+    "aproximacion_secciones_L": {
+      "nota1": "Las secciones L son asimetricas verticalmente pero el ala se extiende en la direccion del eje local y, simetricamente respecto del eje local z (centro del alma).",
+      "nota2": "Producto de inercia Iyz = 0 porque la seccion es simetrica respecto del eje vertical (eje local z). Los ejes centroidales coinciden con los ejes principales.",
+      "nota3": "elasticBeamColumn asume seccion doblemente simetrica. Las propiedades se calculan respecto del centroide real, usando Iy e Iz centroidales."
+    }
+  },
+  "elementos": {
+    "columnas": [
+      {"tag": 1, "nodo_i": "base_A", "nodo_j": "sup_A", "seccion": "columna"},
+      {"tag": 2, "nodo_i": "base_C", "nodo_j": "sup_C", "seccion": "columna"},
+      {"tag": 3, "nodo_i": "base_D", "nodo_j": "sup_D", "seccion": "columna"},
+      {"tag": 4, "nodo_i": "base_F", "nodo_j": "sup_F", "seccion": "columna"}
+    ],
+    "vigas_x": [
+      {"tag": 5, "nodo_i": "sup_A", "nodo_j": "sup_B", "seccion": "viga_L_borde_500"},
+      {"tag": 6, "nodo_i": "sup_B", "nodo_j": "sup_C", "seccion": "viga_L_borde_500"},
+      {"tag": 7, "nodo_i": "sup_D", "nodo_j": "sup_E", "seccion": "viga_L_borde_500"},
+      {"tag": 8, "nodo_i": "sup_E", "nodo_j": "sup_F", "seccion": "viga_L_borde_500"}
+    ],
+    "vigas_y": [
+      {"tag": 9, "nodo_i": "sup_A", "nodo_j": "sup_D", "seccion": "viga_L_borde_890"},
+      {"tag": 10, "nodo_i": "sup_B", "nodo_j": "sup_E", "seccion": "viga_T_interior"},
+      {"tag": 11, "nodo_i": "sup_C", "nodo_j": "sup_F", "seccion": "viga_L_borde_890"}
+    ]
+  },
+  "transformaciones_geometricas": {
+    "columna": {
+      "tipo": "linear",
+      "vecz": [0.0, 1.0, 0.0],
+      "notas": "eje_local_x vertical, vecz apunta en Y global"
+    },
+    "viga_x": {
+      "tipo": "linear",
+      "vecz": [0.0, 0.0, 1.0],
+      "notas": "eje_local_x en X global, vecz apunta en Z global"
+    },
+    "viga_y": {
+      "tipo": "linear",
+      "vecz": [0.0, 0.0, 1.0],
+      "notas": "eje_local_x en Y global, vecz apunta en Z global"
+    }
+  },
+  "apoyos": {
+    "nodos_base": ["base_A", "base_C", "base_D", "base_F"],
+    "condiciones": "empotrado (6 GDL restringidos)",
+    "GDL_restringidos": [1, 2, 3, 4, 5, 6]
+  },
+  "losa": {
+    "num_panos": 2,
+    "dimensiones": [5.0, 8.9],
+    "espesor": 0.15,
+    "area_pano": 44.5,
+    "area_total": 89.0,
+    "densidad_hormigon": 25.0,
+    "peso_propio": 3.75,
+    "terminaciones": 1.25,
+    "carga_superficial_G": 5.0,
+    "carga_total": 445.0
+  },
+  "areas_tributarias": {
+    "por_pano": {
+      "triangular": 6.25,
+      "trapezoidal": 16.0,
+      "verificacion": "6.25 + 6.25 + 16 + 16 = 44.50 m2"
+    },
+    "por_viga": {
+      "AD": {"area": 16.0, "carga": 80.0},
+      "BE": {"area": 32.0, "carga": 160.0},
+      "CF": {"area": 16.0, "carga": 80.0},
+      "AB": {"area": 6.25, "carga": 31.25},
+      "BC": {"area": 6.25, "carga": 31.25},
+      "DE": {"area": 6.25, "carga": 31.25},
+      "EF": {"area": 6.25, "carga": 31.25}
+    },
+    "verificacion_global": "16 + 32 + 16 + 4(6.25) = 89.00 m2"
+  },
+  "cargas_distribuidas": {
+    "viga_5m": {
+      "tipo": "triangular",
+      "w_max": 12.5,
+      "integral": 31.25,
+      "notas": "q_G * 2.5m = 12.50 kN/m"
+    },
+    "viga_8m_exterior": {
+      "tipo": "trapezoidal",
+      "w_max": 12.5,
+      "zona_constante": 3.9,
+      "integral": 80.0,
+      "notas": "q_G * 2.5m = 12.50 kN/m"
+    },
+    "viga_8m_central": {
+      "tipo": "trapezoidal",
+      "w_max": 25.0,
+      "zona_constante": 3.9,
+      "integral": 160.0,
+      "notas": "2 * q_G * 2.5m = 25.00 kN/m"
+    }
+  },
+  "analisis": {
+    "tipo": "estatico_lineal_elastico",
+    "cargas": ["gravitacional"],
+    "no_incluir": ["plasticidad", "fiber_sections", "p_delta", "sismo", "carga_viva"]
+  },
+  "verificaciones": {
+    "tolerancia": 1e-6,
+    "condiciones_aceptacion": [
+      "10 nodos y 11 elementos",
+      "6 GDL por nodo",
+      "geometria correcta",
+      "area_losa = 89.00 m2",
+      "area_tributaria = 89.00 m2",
+      "carga_superficial = 445.00 kN",
+      "carga_vigas = 445.00 kN",
+      "reacciones_Z = 445.00 kN",
+      "equilibrio verificado",
+      "resultados exportados",
+      "visualizacion disponible"
+    ]
+  }
+}

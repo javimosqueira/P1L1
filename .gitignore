@@ -1,0 +1,16 @@
+﻿.venv/
+__pycache__/
+*.pyc
+graficos/
+resultados/
+Resultados_P1L1_SAP.xlsx
+pyrightconfig.json
+*.zip
+P1L1_SAP.sdb
+*.xlsx
+comparar_SAP2000.py
+comparacion_OpenSees_vs_SAP2000.xlsx
+P1L1_SAP.sdb
+benchmark_rectangular/comparar_SAP2000.py
+benchmark_rectangular/generar_excel_comparacion.py
+benchmark_rectangular/comparacion_OpenSees_vs_SAP2000.xlsx
