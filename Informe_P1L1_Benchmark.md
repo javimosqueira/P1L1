@@ -349,7 +349,7 @@ A partir del analisis realizado se concluye que:
 - Los parametros utilizados presentan coherencia fisica y estructural.
 - El equilibrio global fue correctamente verificado (suma RZ = 445 kN, error = 0%).
 - Los desplazamientos y esfuerzos obtenidos se encuentran dentro de rangos esperables.
-- La comparacion con SAP2000 showed una buena concordancia en los indicadores principales:
+- La comparacion con SAP2000 mostro una buena concordancia en los indicadores principales:
   - Reacciones verticales: ~0% de diferencia
   - Momentos flectores: 0.2-0.8% de diferencia
   - Cortantes verticales: ~0% de diferencia
