@@ -331,6 +331,12 @@ Las pequenas diferencias en esfuerzos internos corresponden a variaciones normal
 
 El desplazamiento vertical maximo de -1.567 mm en los nodos B y E es consistente con el comportamiento esperado para una estructura de estas dimensiones y rigidez bajo el nivel de carga aplicado.
 
+La siguiente figura muestra la estructura original y la estructura deformada tras la aplicacion de las cargas. Dado que los desplazamientos reales son del orden de milimetros (invisibles a escala real), la deformacion se presenta amplificada con un factor de 500x para apreciar las curvas de la elastica:
+
+![Estructura original y deformada tras la aplicacion de cargas (amplificacion 500x)](benchmark_rectangular/graficos_rectangular/deformada_escala500.png)
+
+Se observa que la deformacion principal se concentra en la viga central B-E (desplazamiento vertical maximo), mientras que las esquinas (A, C, D, F) permanecen practicamente indeformadas por su conexion rigida con las columnas empotradas.
+
 ### 7.4 Limitaciones
 
 Las diferencias observadas en ciertos componentes (axial en vigas, cortantes horizontales en columnas) se atribuyen a:

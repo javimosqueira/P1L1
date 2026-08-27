@@ -431,11 +431,245 @@ def visualizar_diagramas_vigas(resultados):
         plt.close()
         print("  Guardado: graficos_rectangular/momento_BE.png")
 
+def hermite(t, L):
+    """Funciones de forma de Hermite (viga Euler-Bernoulli) en t=s/L."""
+    t2 = t * t
+    t3 = t2 * t
+    N1 = 1.0 - 3.0 * t2 + 2.0 * t3
+    N2 = L * (t - 2.0 * t2 + t3)
+    N3 = 3.0 * t2 - 2.0 * t3
+    N4 = L * (-t2 + t3)
+    return N1, N2, N3, N4
+
+
+def construir_R(x_eje, vecz):
+    """
+    Matriz de rotacion global->local de un elemento, siguiendo la convencion
+    de OpenSees geomTransf: local_z ~ vecz (ortogonalizado) y local_y = z x x.
+    """
+    L = np.linalg.norm(x_eje)
+    x = x_eje / L
+    v = np.array(vecz, dtype=float)
+    z = v - np.dot(x, v) * x        # ortogonalizar vecz respecto al eje x
+    z = z / np.linalg.norm(z)
+    y = np.cross(z, x)
+    return np.vstack([x, y, z])
+
+
+def elastica_con_carga(fuerzas, puntos, EI, L, wi, wj, n_pts=80):
+    """
+    Reconstruye la deformada transversal (en el plano de flexion vertical)
+    de una viga con carga usando doble integracion de la curvatura.
+
+    M(x) = My_i + Vz_i*x - sum(P_k*(x-s_k))
+    curv = M/EI
+    v''(x) generada por la carga; luego se ajustan 2 constantes para que
+    v(0)=wi y v(L)=wj (desplazamientos nodales reales).
+
+    Devuelve array v(s) con los desplazamientos transversales (local z).
+    """
+    x_vals = np.linspace(0, L, n_pts)
+    s_pos = np.array([p['x/L'] * L for p in puntos])
+    P_vals = np.array([p['P'] for p in puntos])
+
+    My_i = fuerzas['My_i']
+    Vz_i = fuerzas['Vz_i']
+
+    # M(x) e integrandos
+    M = np.zeros(n_pts)
+    for idx, x in enumerate(x_vals):
+        M[idx] = My_i + Vz_i * x
+        sel = s_pos < x - 1e-9
+        if np.any(sel):
+            M[idx] -= np.sum(P_vals[sel] * (x - s_pos[sel]))
+
+    curva = M / EI          # curvatura (1/m)
+    # g(x) = integral de curva de 0 a x (trapezoidal acumulada)
+    g = np.concatenate([[0.0], np.cumsum(0.5 * (curva[1:] + curva[:-1]) * (x_vals[1:] - x_vals[:-1]))])
+    # doble integral h(x) = integral de g de 0 a x
+    h = np.concatenate([[0.0], np.cumsum(0.5 * (g[1:] + g[:-1]) * (x_vals[1:] - x_vals[:-1]))])
+
+    # v(x) = C0 + C1*x + h(x)   -> v(0)=wi => C0=wi ; v(L)=wj => C1=(wj - wi - h[L])/L
+    C0 = wi
+    C1 = (wj - wi - h[-1]) / L
+    v = C0 + C1 * x_vals + h
+    return x_vals, v
+
+
+def curvas_deformadas(datos, resultados, factor_escala):
+    """
+    Reconstruye la elastica completa de vigas (integrando la carga) y de
+    columnas (Hermite con giros nodales), proyectando en coordenadas globales.
+    """
+    nodos_base = datos['nodos']['base']
+    nodos_sup = datos['nodos']['superior']
+    desp = resultados['desplazamientos']
+
+    E = datos['materiales']['concreto']['E']
+    # Flexion vertical 3D usa Iy (todos los elementos con Iy de su seccion)
+    Iy = datos['secciones']['viga_T_interior']['Iy']
+    EI = E * Iy
+
+    nodos = {}
+    for nombre, c in nodos_base.items():
+        nodos['base_' + nombre] = (np.array(c, dtype=float),
+                                   np.array([desp['base_' + nombre][k] for k in
+                                             ['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ']]))
+    for nombre, c in nodos_sup.items():
+        nodos['sup_' + nombre] = (np.array(c, dtype=float),
+                                  np.array([desp['sup_' + nombre][k] for k in
+                                            ['UX', 'UY', 'UZ', 'RX', 'RY', 'RZ']]))
+
+    # tag -> (nombre_ni, nombre_nj, vecz, tipo, grupo_carga)
+    defs = {
+        1: ('base_A', 'sup_A', (0, 1, 0), 'col', None),
+        2: ('base_C', 'sup_C', (0, 1, 0), 'col', None),
+        3: ('base_D', 'sup_D', (0, 1, 0), 'col', None),
+        4: ('base_F', 'sup_F', (0, 1, 0), 'col', None),
+        5: ('sup_A', 'sup_B', (0, 0, 1), 'viga', 'viga_5m'),
+        6: ('sup_B', 'sup_C', (0, 0, 1), 'viga', 'viga_5m'),
+        7: ('sup_D', 'sup_E', (0, 0, 1), 'viga', 'viga_5m'),
+        8: ('sup_E', 'sup_F', (0, 0, 1), 'viga', 'viga_5m'),
+        9: ('sup_A', 'sup_D', (0, 0, 1), 'viga', 'viga_8m_ext'),
+        10: ('sup_B', 'sup_E', (0, 0, 1), 'viga', 'viga_8m_cent'),
+        11: ('sup_C', 'sup_F', (0, 0, 1), 'viga', 'viga_8m_ext'),
+    }
+
+    ligas_orig = []
+    curvas_def = []
+    puntos_def = []
+    n_pts = 80
+
+    for tag, (ni, nj, vecz, tipo, grupo) in defs.items():
+        Pi, Ui = nodos[ni]
+        Pj, Uj = nodos[nj]
+        ligas_orig.append((Pi, Pj))
+
+        x_eje = Pj - Pi
+        L = np.linalg.norm(x_eje)
+        R = construir_R(x_eje, vecz)
+
+        fu = resultados['fuerzas_locales_elementos'][f'elem_{tag}']
+        # desplazamientos reales (escala 1) en local
+        d_i = np.array([Ui[0], Ui[1], Ui[2]])
+        d_j = np.array([Uj[0], Uj[1], Uj[2]])
+        u_i = R @ d_i
+        u_j = R @ d_j
+        wx_i, wy_i, wz_i = u_i   # local: x=axial, y, z
+        wx_j, wy_j, wz_j = u_j
+
+        if tipo == 'viga' and grupo in resultados['cargas_elementos']:
+            puntos = resultados['cargas_elementos'][grupo]['puntos']
+            x_vals, v_local = elastica_con_carga(fu, puntos, EI, L, wz_i, wz_j, n_pts)
+            # deformacion axial y en local y (lineal, despreciables)
+            ux_loc = wx_i + (wx_j - wx_i) * (x_vals / L)
+            uy_loc = wy_i + (wy_j - wy_i) * (x_vals / L)
+            u_local = np.column_stack([ux_loc, uy_loc, v_local])
+        else:
+            # columnas: Hermite con giros nodales reales (escala 1)
+            th_i = R @ np.array(Ui[3:6])
+            th_j = R @ np.array(Uj[3:6])
+            ux_i, v_i, w_i = u_i
+            ux_j, v_j, w_j = u_j
+            thx_i, thy_i, thz_i = th_i
+            thx_j, thy_j, thz_j = th_j
+            t_vals = np.linspace(0, 1, n_pts)
+            u_local = np.zeros((n_pts, 3))
+            for idx, t in enumerate(t_vals):
+                N1, N2, N3, N4 = hermite(t, L)
+                u_local[idx, 0] = ux_i + (ux_j - ux_i) * t
+                u_local[idx, 1] = N1 * v_i + N2 * thz_i + N3 * v_j + N4 * thz_j
+                u_local[idx, 2] = N1 * w_i + N2 * (-thy_i) + N3 * w_j + N4 * (-thy_j)
+
+        # punto sobre eje original
+        t_axis = np.linspace(0, 1, u_local.shape[0])
+        P_eje = Pi[None, :] + (Pj - Pi)[None, :] * t_axis[:, None]
+        # desplazamiento total = (curva elastica - elongacion axial lineal ya incluida)*escala
+        P_def = P_eje + (u_local * factor_escala) @ R
+        curvas_def.append(P_def)
+
+        puntos_def.append(P_def[0])
+        # asegurar que el extremo j quede registrado
+        if tag in [4, 8, 11]:
+            puntos_def.append(P_def[-1])
+
+    return ligas_orig, curvas_def, puntos_def
+
+
+def visualizar_deformada(datos, resultados, factor_escala=500, nombre_archivo='deformada.png'):
+    """
+    Visualiza la estructura original y deformada tras aplicar cargas,
+    reconstruyendo la elastica completa (curvas de Hermite) de cada viga.
+
+    factor_escala: amplificacion de los desplazamientos para hacer visible
+    la deformacion (el valor real del desplazamiento maximo es ~1-2 mm).
+    nombre_archivo: nombre del PNG a guardar en graficos_rectangular/.
+    """
+    ligas_orig, curvas_def, puntos_def = curvas_deformadas(datos, resultados, factor_escala)
+
+    fig = plt.figure(figsize=(15, 10))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Estructura original (gris solido)
+    for i, (Pi, Pj) in enumerate(ligas_orig):
+        ax.plot([Pi[0], Pj[0]], [Pi[1], Pj[1]], [Pi[2], Pj[2]],
+                '-', color='gray', linewidth=2, alpha=0.6,
+                label='Original' if i == 0 else '')
+
+    # Estructura deformada (curvas de Hermite, rojo)
+    for i, curva in enumerate(curvas_def):
+        ax.plot(curva[:, 0], curva[:, 1], curva[:, 2],
+                '-', color='red', linewidth=2.5,
+                label='Deformada (elastica, x%d)' % factor_escala if i == 0 else '')
+
+    # Nodos
+    for Pi, Pj in ligas_orig:
+        ax.scatter(Pi[0], Pi[1], Pi[2], c='gray', s=60)
+    for p in puntos_def:
+        ax.scatter(p[0], p[1], p[2], c='red', s=80)
+
+    desp = resultados['desplazamientos']
+    # Etiquetas de desplazamiento en nodos B y E
+    for nombre in ['B', 'E']:
+        d = desp['sup_' + nombre]
+        nodos_sup = datos['nodos']['superior']
+        c = np.array(nodos_sup[nombre]) + np.array([d['UX'], d['UY'], d['UZ']]) * factor_escala
+        ax.text(c[0], c[1], c[2] + 0.25, f'{nombre} UZ={d["UZ"]*1000:.2f} mm',
+                fontsize=10, color='red', fontweight='bold')
+
+    ax.set_xlabel('X (m)')
+    ax.set_ylabel('Y (m)')
+    ax.set_zlabel('Z (m)')
+    titulo_escala = (' (amplificacion x%d)' % factor_escala) if factor_escala != 1 else ' (escala real)'
+    ax.set_title('Estructura Original y Deformada tras Aplicar Cargas\n'
+                'Elastica reconstruida%s' % titulo_escala)
+
+    ax.legend(loc='upper left')
+    ax.view_init(elev=20, azim=45)
+
+    plt.tight_layout()
+    plt.savefig(Path(__file__).parent / 'graficos_rectangular' / nombre_archivo, dpi=150, bbox_inches='tight')
+    plt.close()
+    print("  Guardado: graficos_rectangular/%s" % nombre_archivo)
+
+
+def visualizar_deformadas(datos, resultados):
+    """
+    Genera dos comparaciones original vs deformada:
+      - deformada_escala1.png   : escala real (la deformacion es casi imperceptible)
+      - deformada_escala500.png : amplificada x500 para apreciar las curvas
+    """
+    # Escala real (x1)
+    visualizar_deformada(datos, resultados, factor_escala=1,
+                         nombre_archivo='deformada_escala1.png')
+    # Amplificada (x500)
+    visualizar_deformada(datos, resultados, factor_escala=500,
+                         nombre_archivo='deformada_escala500.png')
+
 def main():
     print("=" * 60)
     print("VISUALIZACION - BENCHMARK RECTANGULAR 3D")
     print("=" * 60)
-    
     ruta_datos = Path(__file__).parent / 'datos_entrada.json'
     ruta_resultados = Path(__file__).parent / 'resultados_rectangular' / 'resultados.json'
     
@@ -455,6 +689,9 @@ def main():
     
     print("Generando ejes locales...")
     visualizar_ejes_locales(datos)
+    
+    print("Generando estructura deformada...")
+    visualizar_deformadas(datos, resultados)
     
     print("Generando diagramas de fuerzas internas...")
     visualizar_diagramas_vigas(resultados)
